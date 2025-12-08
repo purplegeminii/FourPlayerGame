@@ -1,0 +1,23 @@
+{
+  "floor": 1,
+  "players": [
+    {
+      "name": "p1",
+      "level": 1,
+      "rank": "F",
+      "jobIndex": 1,
+      "hp": 1109,
+      "mp": 80,
+      "strength": 8,
+      "insight": 1,
+      "agility": 4,
+      "vitality": 10,
+      "talent": 7,
+      "inventory": [
+      ],
+      "equipped": {
+        "hands": {"name": "Starter Gear", "type": "Equipment", "rank": "white", "statBoost": 1, "slot": "hands" }
+      }
+    }
+  ]
+}

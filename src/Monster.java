@@ -3,31 +3,51 @@
  * @verison 1.0.0
  */
 
-import java.util.Random;
+import java.util.*;
 public class Monster {
     Random rand = new Random();
 
     private String monsterName;
+    private int floorNumber;
+    private final String[] types = {"Slime", "Goblin", "Skeleton", "Orc", "Troll", "Wraith"};
     private final String[] ranks = {"normal", "general", "lord"};
     private String monsterRank;
     private int monsterHP;
     private int monsterMP;
     private int damage;
+    private final int DIFFICULTY_SCALE_DIV = 4;  // bigger means weaker monsters
+    
 
     public Monster(int diff) {
-        if (diff == 1) {
-            this.monsterName = "Goblin";
-            this.monsterRank = this.getMonsterRank();
-            int minDamage = 20;
-            int maxDamage = 60;
-            this.damage = (int)Math.floor(Math.random() * (maxDamage - minDamage + 1) + minDamage);
-            int minHP = 100;
-            int maxHP = 1000;
-            this.monsterHP = (int)Math.floor(Math.random() * (maxHP - minHP + 1) + minHP);
-            int minMP = 10;
-            int maxMP = 200;
-            this.monsterMP = (int)Math.floor(Math.random() * (maxMP - minMP + 1) + minMP);
-        }
+        // record floor/difficulty
+        this.floorNumber = diff;
+
+        // Choose a monster type. Allow more variety at higher floors (diff).
+        int availableTypes = Math.min(types.length, Math.max(1, diff + 1));
+        this.monsterName = types[rand.nextInt(availableTypes)];
+        this.monsterRank = this.getMonsterRank();
+
+        // Base ranges
+        int baseMinDamage = 20;
+        int baseMaxDamage = 60;
+        int baseMinHP = 100;
+        int baseMaxHP = 1000;
+        int baseMinMP = 10;
+        int baseMaxMP = 200;
+
+        // Scale ranges by difficulty (diff >= 1). Higher floors = tougher monsters.
+        // Reduce difficulty scaling: divide floor-based scaling by 2 to make monsters weaker
+        int minDamage = Math.max(1, (baseMinDamage * diff) / DIFFICULTY_SCALE_DIV);
+        int maxDamage = Math.max(minDamage, (baseMaxDamage * diff) / DIFFICULTY_SCALE_DIV);
+        this.damage = rand.nextInt(Math.max(1, maxDamage - minDamage + 1)) + minDamage;
+
+        int minHP = Math.max(1, (baseMinHP * diff) / DIFFICULTY_SCALE_DIV);
+        int maxHP = Math.max(minHP, (baseMaxHP * diff) / DIFFICULTY_SCALE_DIV);
+        this.monsterHP = rand.nextInt(Math.max(1, maxHP - minHP + 1)) + minHP;
+
+        int minMP = Math.max(0, (baseMinMP * diff) / DIFFICULTY_SCALE_DIV);
+        int maxMP = Math.max(minMP, (baseMaxMP * diff) / DIFFICULTY_SCALE_DIV);
+        this.monsterMP = rand.nextInt(Math.max(1, maxMP - minMP + 1)) + minMP;
     }
 
     public int getDamage() {
@@ -60,54 +80,84 @@ public class Monster {
         return this.monsterHP;
     }
 
-    public static void attack(int player_to_atk, int monster_dealing_dmg, Player[] players, Monster[] floorMonsters) {
-
-        for (int i=0; i < floorMonsters.length; i++) {
-            Monster current_mob;
-            Player current_player;
-            int dmg_received;
-            int new_playerHP;
-            if (monster_dealing_dmg == i) {
-                if (player_to_atk == 0) {
-                    current_mob = floorMonsters[i];
-                    dmg_received = current_mob.getDamage();
-                    current_player = players[0];
-                    new_playerHP = current_player.getHealthBar() - dmg_received;
-                    current_player.setHealthBar(new_playerHP);
-                    System.out.println(current_mob.getMonsterName()+" is attacking "+current_player.getPlayerName());
-                    System.out.println(current_player.getPlayerName() + " has lost " + dmg_received + " HP");
-                    break;
-                } else if (player_to_atk == 1) {
-                    current_mob = floorMonsters[i];
-                    dmg_received = current_mob.getDamage();
-                    current_player = players[1];
-                    new_playerHP = current_player.getHealthBar() - dmg_received;
-                    current_player.setHealthBar(new_playerHP);
-                    System.out.println(current_mob.getMonsterName()+" is attacking "+current_player.getPlayerName());
-                    System.out.println(current_player.getPlayerName() + " has lost " + dmg_received + " HP");
-                    break;
-                } else if (player_to_atk == 2) {
-                    current_mob = floorMonsters[i];
-                    dmg_received = current_mob.getDamage();
-                    current_player = players[2];
-                    new_playerHP = current_player.getHealthBar() - dmg_received;
-                    current_player.setHealthBar(new_playerHP);
-                    System.out.println(current_mob.getMonsterName()+" is attacking "+current_player.getPlayerName());
-                    System.out.println(current_player.getPlayerName() + " has lost " + dmg_received + " HP");
-                    break;
-                } else if (player_to_atk == 3) {
-                    current_mob = floorMonsters[i];
-                    dmg_received = current_mob.getDamage();
-                    current_player = players[3];
-                    new_playerHP = current_player.getHealthBar() - dmg_received;
-                    current_player.setHealthBar(new_playerHP);
-                    System.out.println(current_mob.getMonsterName()+" is attacking "+current_player.getPlayerName());
-                    System.out.println(current_player.getPlayerName() + " has lost " + dmg_received + " HP");
-                    break;
-                }
+    // XP reward for defeating this monster
+    public int getXpReward() {
+        int base = Math.max(1, this.floorNumber * 10);
+        int extra = rand.nextInt(Math.max(1, this.floorNumber * 5));
+        int total = base + extra;
+        // Increase reward for tougher ranks
+        if (this.monsterRank != null) {
+            if (this.monsterRank.contains("general")) {
+                total += Math.max(1, this.floorNumber * 10);
+            } else if (this.monsterRank.contains("lord")) {
+                total += Math.max(1, this.floorNumber * 25);
             }
         }
+        return total;
+    }
 
+    /**
+     * Apply damage to this monster. If the monster dies, return a dropped Item (or null).
+     * @param damageAmount damage dealt
+     * @return Item dropped or null
+     */
+    public Item takeDamage(int damageAmount) {
+        this.monsterHP -= damageAmount;
+        System.out.println(this.getMonsterName() + " took " + damageAmount + " damage. Remaining HP: " + Math.max(0, this.monsterHP));
+        if (this.monsterHP <= 0) {
+            System.out.println(this.getMonsterName() + " has been defeated!");
+            // drop logic: chance-based
+            int chance = rand.nextInt(100);
+            if (chance < 60) { // 60% consumable
+                String[] result = new String[] {"Health", "Mana"};
+                String chosen = result[rand.nextInt(result.length)];
+                return new Consumable(String.format("%s Potion", chosen), "Consumable", this.floorNumber);
+            } else if (chance < 90) { // 30% equipment
+                String[] eqNames = {"Bronze Sword", "Iron Shield", "Mystic Robe", "Swift Boots"};
+                String name = eqNames[rand.nextInt(eqNames.length)];
+                // choose slot using the data-driven mapping: first matching substring key
+                String lname = name.toLowerCase();
+                String pos = null;
+                for (Map.Entry<String,String> e : Equipment.EQUIP_SLOT_MAP.entrySet()) {
+                    if (lname.contains(e.getKey())) { pos = e.getValue(); break; }
+                }
+                if (pos == null) {
+                    // fallback to random slot
+                    String[] poss = {"head", "chest", "legs", "hands", "feet"};
+                    pos = poss[rand.nextInt(poss.length)];
+                }
+                return new Equipment(name, pos, this.floorNumber);
+            } else {
+                return null; // no drop
+            }
+        }
+        return null;
+    }
+
+    public static void attack(int player_to_atk, int monster_dealing_dmg, Player[] players, Monster[] floorMonsters) {
+        // Find the monster that is dealing damage (index: monster_dealing_dmg)
+        if (monster_dealing_dmg < 0 || monster_dealing_dmg >= floorMonsters.length) return;
+        Monster current_mob = floorMonsters[monster_dealing_dmg];
+        if (current_mob == null) return;
+
+        // Validate target player index
+        if (player_to_atk < 0 || player_to_atk >= players.length) {
+            // invalid player index; default to first alive player
+            int fallback = -1;
+            for (int pi = 0; pi < players.length; pi++) {
+                if (players[pi].getHealthBar() > 0) { fallback = pi; break; }
+            }
+            if (fallback == -1) return; // no alive players
+            player_to_atk = fallback;
+        }
+
+        Player current_player = players[player_to_atk];
+        int dmg_received = current_mob.getDamage();
+        int new_playerHP = current_player.getHealthBar() - dmg_received;
+        current_player.setHealthBar(new_playerHP);
+        System.out.println(current_mob.getMonsterName() + " is attacking " + current_player.getPlayerName());
+        System.out.println(current_player.getPlayerName() + " has lost " + dmg_received + " HP");
+        
     }
 
     /**
@@ -118,7 +168,7 @@ public class Monster {
     public static boolean allMonstersDead(Monster[] floorMonsters) {
         int yes = 0;
         for (Monster floorMonster : floorMonsters)
-            if (floorMonster.monsterHP == 0) {
+            if (floorMonster.monsterHP <= 0) {
                 yes++;
             }
         return yes == floorMonsters.length;
