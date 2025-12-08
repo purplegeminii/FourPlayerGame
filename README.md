@@ -112,6 +112,12 @@ Future improvements (ideas)
 - More sophisticated AI for auto-play: conditional potion usage, equipment priorities, team tactics.
 - Replace ad-hoc JSON handling with a small library (e.g., Gson) to make save/load more robust.
 
+Contributing & Community
+------------------------
+See `CONTRIBUTING.md` for how to report issues, run the project locally, and submit pull requests. Please also read `CODE_OF_CONDUCT.md` to understand expected community behavior.
+
+If you'd like to propose a change quickly, open an issue and choose the appropriate template (bug report or feature request). Pull requests should follow the guidance in `CONTRIBUTING.md`.
+
 License
 -------
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
