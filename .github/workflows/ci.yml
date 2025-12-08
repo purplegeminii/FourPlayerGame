@@ -1,0 +1,38 @@
+name: Java CI
+
+on:
+  push:
+    branches: [ test, master ]
+  pull_request:
+    branches: [ test, master ]
+  # Allow manual runs from the Actions UI with optional inputs for the smoke test
+  workflow_dispatch:
+    inputs:
+      turns:
+        description: 'Number of auto-play turns to run in the smoke test'
+        required: false
+        default: '5'
+      checkpoint:
+        description: 'Checkpoint interval for the smoke test'
+        required: false
+        default: '1'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Compile Java sources
+        run: javac src/*.java -d out
+
+      - name: Run smoke test (auto-play)
+        run: java -cp out Main auto ${{ github.event.inputs.turns }} ${{ github.event.inputs.checkpoint }}
