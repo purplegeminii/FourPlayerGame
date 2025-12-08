@@ -1,6 +1,9 @@
 
+
 FourPlayerGame
 ==============
+
+
 
 A compact, turn-based Java console RPG for local play or automated simulation.
 
@@ -23,7 +26,7 @@ Build
 Compile all sources to `out/`:
 
 ```bash
-cd /FourPlayerGame
+cd /Users/purplegeminii/Desktop/FourPlayerGame
 javac src/*.java -d out
 ```
 
@@ -114,7 +117,7 @@ Future improvements (ideas)
 
 License
 -------
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+This project is currently unlicensed. Add a `LICENSE` file if you want to apply an open-source license.
 
 Questions / next steps
 ---------------------
