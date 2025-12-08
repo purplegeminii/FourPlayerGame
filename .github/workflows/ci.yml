@@ -2,9 +2,20 @@ name: Java CI
 
 on:
   push:
-    branches: [ test ]
+    branches: [ test, master ]
   pull_request:
-    branches: [ test ]
+    branches: [ test, master ]
+  # Allow manual runs from the Actions UI with optional inputs for the smoke test
+  workflow_dispatch:
+    inputs:
+      turns:
+        description: 'Number of auto-play turns to run in the smoke test'
+        required: false
+        default: '5'
+      checkpoint:
+        description: 'Checkpoint interval for the smoke test'
+        required: false
+        default: '1'
 
 jobs:
   build:
@@ -23,5 +34,5 @@ jobs:
       - name: Compile Java sources
         run: javac src/*.java -d out
 
-      - name: Run smoke test (auto-play 5 turns)
-        run: java -cp out Main auto 5 1
+      - name: Run smoke test (auto-play)
+        run: java -cp out Main auto ${{ github.event.inputs.turns }} ${{ github.event.inputs.checkpoint }}
