@@ -114,7 +114,7 @@ Future improvements (ideas)
 
 License
 -------
-This project is currently unlicensed. Add a `LICENSE` file if you want to apply an open-source license.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Questions / next steps
 ---------------------
