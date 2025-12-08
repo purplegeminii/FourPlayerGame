@@ -2,9 +2,9 @@ name: Java CI
 
 on:
   push:
-    branches: [ master, test ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, test ]
+    branches: [ master ]
   # Allow manual runs from the Actions UI with optional inputs for the smoke test
   workflow_dispatch:
     inputs:
