@@ -16,10 +16,16 @@ public class Main {
 
         Random rand = new Random();
 
-        // At startup ask whether to load saved JSON or start a new game
-        System.out.println("Load saved game from save_progress.json? 1=Load, 2=New (default 2):");
+        // At startup decide whether to load saved JSON or start a new game
         int loadChoice = 2;
-        try { loadChoice = input.nextInt(); } catch (Exception e) { input.nextLine(); loadChoice = 2; }
+        if (args != null && args.length >= 1 && "auto".equals(args[0])) {
+            // In auto mode we default to starting a new game (2) and skip prompting
+            System.out.println("Auto mode detected — starting a new game (no load)");
+            loadChoice = 2;
+        } else {
+            System.out.println("Load saved game from save_progress.json? 1=Load, 2=New (default 2):");
+            try { loadChoice = input.nextInt(); } catch (Exception e) { input.nextLine(); loadChoice = 2; }
+        }
 
         Player[] players = null;
         Floor currentFloor = null;
@@ -56,14 +62,21 @@ public class Main {
 
         if (loadChoice != 1) {
             // New game flow
-            System.out.println("How many players will play? Enter a number (1-4):");
-            int numPlayers = 4;
-            try {
-                numPlayers = Math.max(1, Math.min(4, input.nextInt()));
-            } catch (Exception e) {
-                // if the user types something unexpected, default to 4
-                input.nextLine();
+            int numPlayers;
+            if (args != null && args.length >= 1 && "auto".equals(args[0])) {
+                // Auto mode: randomly choose 1-4 players
+                numPlayers = rand.nextInt(4) + 1;
+                System.out.println("Auto mode: randomly selected " + numPlayers + " player(s)");
+            } else {
+                System.out.println("How many players will play? Enter a number (1-4):");
                 numPlayers = 4;
+                try {
+                    numPlayers = Math.max(1, Math.min(4, input.nextInt()));
+                } catch (Exception e) {
+                    // if the user types something unexpected, default to 4
+                    input.nextLine();
+                    numPlayers = 4;
+                }
             }
 
             // Choose the starter item type: 1=Consumable, 2=Equipment, 3=Generic Item
@@ -119,16 +132,27 @@ public class Main {
                 }
             }
 
-            for (int num = 0; num < players.length; num++) {
-                System.out.println("\nPlayer" + (num+1) + " name:");
-                String pl_name = input.next();
-                players[num].setPlayerName(pl_name);
-                System.out.println(
-                        "What job do you want to awaken with:"+"\n"+
-                        "Warrior=0, Mage=1, Thief=2, Swordsman=3"
-                );
-                int jobIndex = input.nextInt();
-                players[num].setPlayerJob(jobIndex);
+            if (args != null && args.length >= 1 && "auto".equals(args[0])) {
+                // Auto-mode: create bot players with names bot1..botN and random jobs
+                for (int num = 0; num < players.length; num++) {
+                    String botName = "bot" + (num + 1);
+                    players[num].setPlayerName(botName);
+                    int jobIndex = rand.nextInt(4); // 0=Warrior,1=Mage,2=Thief,3=Swordsman
+                    players[num].setPlayerJob(jobIndex);
+                    System.out.println("Auto-created player: " + botName + " (job " + jobIndex + ")");
+                }
+            } else {
+                for (int num = 0; num < players.length; num++) {
+                    System.out.println("\nPlayer" + (num+1) + " name:");
+                    String pl_name = input.next();
+                    players[num].setPlayerName(pl_name);
+                    System.out.println(
+                            "What job do you want to awaken with:"+"\n"+
+                            "Warrior=0, Mage=1, Thief=2, Swordsman=3"
+                    );
+                    int jobIndex = input.nextInt();
+                    players[num].setPlayerJob(jobIndex);
+                }
             }
             Player.beginnerSummary(players);
 
