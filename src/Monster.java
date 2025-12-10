@@ -13,6 +13,7 @@ public class Monster {
     private final String[] ranks = {"normal", "general", "lord"};
     private String monsterRank;
     private int monsterHP;
+    private int maxHP;
     private int monsterMP;
     private int damage;
     private final int DIFFICULTY_SCALE_DIV = 4;  // bigger means weaker monsters
@@ -44,6 +45,8 @@ public class Monster {
         int minHP = Math.max(1, (baseMinHP * diff) / DIFFICULTY_SCALE_DIV);
         int maxHP = Math.max(minHP, (baseMaxHP * diff) / DIFFICULTY_SCALE_DIV);
         this.monsterHP = rand.nextInt(Math.max(1, maxHP - minHP + 1)) + minHP;
+        // record initial HP as max HP for UI/proportion purposes
+        this.maxHP = this.monsterHP;
 
         int minMP = Math.max(0, (baseMinMP * diff) / DIFFICULTY_SCALE_DIV);
         int maxMP = Math.max(minMP, (baseMaxMP * diff) / DIFFICULTY_SCALE_DIV);
@@ -65,10 +68,10 @@ public class Monster {
 
     public void monsterStatus() {
         System.out.println(
-                "Monster Name: "+this.monsterName+"\n"+
-                "Rank: "+this.getMonsterRank()+"\n"+
-                "HP: "+this.monsterHP+"\n"+
-                "MP: "+this.monsterMP
+            "Monster Name: "+this.monsterName+"\n"+
+            "Rank: "+this.getMonsterRank()+"\n"+
+            "HP: "+this.monsterHP+"\n"+
+            "MP: "+this.monsterMP
         );
     }
 
@@ -78,6 +81,11 @@ public class Monster {
 
     public int getRemainingHealth() {
         return this.monsterHP;
+    }
+
+    // Return the monster's initial / maximum health (set when the monster was created)
+    public int getMaxHealth() {
+        return Math.max(1, this.maxHP);
     }
 
     // XP reward for defeating this monster

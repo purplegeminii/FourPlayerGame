@@ -79,6 +79,23 @@ public class Player {
         }
     }
 
+    /**
+     * Public helper for UI: return skill names available for a given job in order.
+     * @param job job name (one of Player.jobs)
+     * @return array of skill names (may be empty)
+     */
+    public static String[] getSkillNamesForJob(String job) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        switch (job) {
+            case "WARRIOR" -> out.addAll(warrior_act.keySet());
+            case "MAGE" -> out.addAll(mage_act.keySet());
+            case "THIEF" -> out.addAll(thief_act.keySet());
+            case "SWORDSMAN" -> out.addAll(swordsman_act.keySet());
+            default -> {}
+        }
+        return out.toArray(new String[0]);
+    }
+
     Random rand = new Random();
     ArrayList<Item> inventory = new ArrayList<>();
     HashMap<String, Equipment> equipped = new HashMap<>();
@@ -459,6 +476,51 @@ public class Player {
                          + "| HP: "+this.getHealthBar()+"\n"
                          + "| MP: "+this.getManaBar()+"\n"
                          + "________________________________________");
+    }
+
+    /**
+     * Return the full status as a string (for GUI display).
+     * @return multiline status string
+     */
+    public String getFullStatusString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("________________________________________\n");
+        sb.append("| Name: ").append(this.getPlayerName()).append("\n");
+        sb.append("| Level: ").append(this.getPlayerLevel()).append("\n");
+        sb.append("| Rank: ").append(this.getPlayerRank()).append("\n");
+        sb.append("| Job: ").append(this.getPlayerJob()).append("\n");
+        sb.append("|\n");
+        sb.append("| HP: ").append(this.getHealthBar()).append("\n");
+        sb.append("| MP: ").append(this.getManaBar()).append("\n");
+        sb.append("|\n");
+        sb.append("| Strength: ").append(this.getStrength()).append("\n");
+        sb.append("| Insight: ").append(this.getInsight()).append("\n");
+        sb.append("| Agility: ").append(this.getAgility()).append("\n");
+        sb.append("| Vitality: ").append(this.getVitality()).append("\n");
+        sb.append("| Talent: ").append(this.getTalent()).append("\n");
+        sb.append("|\n");
+        sb.append("| Power Level: ").append(this.getPlayerPowerLevel()).append("\n");
+        sb.append("| Equipped: ").append(getEquippedSummary()).append("\n");
+        sb.append("________________________________________");
+        return sb.toString();
+    }
+
+    /**
+     * Return the short status as a string (for GUI display).
+     * @return short multiline status string
+     */
+    public String getShortStatusString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("________________________________________\n");
+        sb.append("| Name: ").append(this.getPlayerName()).append("\n");
+        sb.append("| Level: ").append(this.getPlayerLevel()).append("\n");
+        sb.append("| Rank: ").append(this.getPlayerRank()).append("\n");
+        sb.append("| Job: ").append(this.getPlayerJob()).append("\n");
+        sb.append("|\n");
+        sb.append("| HP: ").append(this.getHealthBar()).append("\n");
+        sb.append("| MP: ").append(this.getManaBar()).append("\n");
+        sb.append("________________________________________");
+        return sb.toString();
     }
 
     /**

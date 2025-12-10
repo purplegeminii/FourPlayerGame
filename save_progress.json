@@ -1,22 +1,83 @@
 {
-  "floor": 1,
+  "floor": 2,
   "players": [
     {
-      "name": "p1",
-      "level": 1,
+      "name": "1",
+      "level": 2,
       "rank": "F",
-      "jobIndex": 1,
-      "hp": 1109,
-      "mp": 80,
-      "strength": 8,
-      "insight": 1,
-      "agility": 4,
+      "experience": 34,
+      "jobIndex": 0,
+      "hp": 1460,
+      "mp": 150,
+      "strength": 11,
+      "insight": 6,
+      "agility": 2,
       "vitality": 10,
-      "talent": 7,
+      "talent": 6,
       "inventory": [
+        {"name": "Starter Potion", "type": "Consumable", "rank": "black", "statBoost": 4, "slot": null },
+        {"name": "Mana Potion", "type": "Consumable", "rank": "white", "statBoost": 1, "slot": null },
+        {"name": "Health Potion", "type": "Consumable", "rank": "white", "statBoost": 1, "slot": null }
       ],
       "equipped": {
-        "hands": {"name": "Starter Gear", "type": "Equipment", "rank": "white", "statBoost": 1, "slot": "hands" }
+      }
+    },
+    {
+      "name": "2",
+      "level": 1,
+      "rank": "F",
+      "experience": 10,
+      "jobIndex": 1,
+      "hp": 1007,
+      "mp": 135,
+      "strength": 9,
+      "insight": 5,
+      "agility": 10,
+      "vitality": 6,
+      "talent": 6,
+      "inventory": [
+        {"name": "Starter Potion", "type": "Consumable", "rank": "gold", "statBoost": 8, "slot": null },
+        {"name": "Mana Potion", "type": "Consumable", "rank": "black", "statBoost": 5, "slot": null }
+      ],
+      "equipped": {
+      }
+    },
+    {
+      "name": "3",
+      "level": 1,
+      "rank": "F",
+      "experience": 0,
+      "jobIndex": 2,
+      "hp": 960,
+      "mp": 40,
+      "strength": 4,
+      "insight": 0,
+      "agility": 3,
+      "vitality": 9,
+      "talent": 4,
+      "inventory": [
+        {"name": "Starter Potion", "type": "Consumable", "rank": "purple", "statBoost": 13, "slot": null }
+      ],
+      "equipped": {
+      }
+    },
+    {
+      "name": "4",
+      "level": 1,
+      "rank": "F",
+      "experience": 0,
+      "jobIndex": 3,
+      "hp": 1129,
+      "mp": 55,
+      "strength": 7,
+      "insight": 1,
+      "agility": 10,
+      "vitality": 9,
+      "talent": 4,
+      "inventory": [
+        {"name": "Starter Potion", "type": "Consumable", "rank": "black", "statBoost": 4, "slot": null }
+      ],
+      "equipped": {
       }
     }
   ]

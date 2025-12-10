@@ -15,6 +15,14 @@ public class Main {
     public static void main(String[] args) {
 
         Random rand = new Random();
+        boolean guiMode = false;
+        boolean autoMode = false;
+        if (args != null) {
+            for (String a : args) {
+                if ("gui".equals(a)) guiMode = true;
+                if ("auto".equals(a)) autoMode = true;
+            }
+        }
 
         // At startup decide whether to load saved JSON or start a new game
         int loadChoice = 2;
@@ -29,6 +37,8 @@ public class Main {
 
         Player[] players = null;
         Floor currentFloor = null;
+        // reference to GUI window (if requested)
+        GameWindow gw = null;
         int player_to_atk;
         int monster_dealing_dmg;
 
@@ -132,7 +142,7 @@ public class Main {
                 }
             }
 
-            if (args != null && args.length >= 1 && "auto".equals(args[0])) {
+            if (autoMode) {
                 // Auto-mode: create bot players with names bot1..botN and random jobs
                 for (int num = 0; num < players.length; num++) {
                     String botName = "bot" + (num + 1);
@@ -156,6 +166,8 @@ public class Main {
             }
             Player.beginnerSummary(players);
 
+            // GUI will be launched after we create the first Floor so it has a valid reference.
+
 
             // Floor 1 (using Floor class)
             System.out.println("All player(s) arrived on the first floor of the tower");
@@ -168,6 +180,39 @@ public class Main {
             player_to_atk = rand.nextInt(players.length);
             monster_dealing_dmg = rand.nextInt(floorMonsters.length);
             Monster.attack(player_to_atk, monster_dealing_dmg, players, currentFloor.getMonsters());
+        }
+
+        // If GUI mode requested, launch visualizer now that `currentFloor` exists.
+        if (guiMode && currentFloor != null) {
+            try {
+                gw = new GameWindow(currentFloor, players);
+            } catch (Throwable t) {
+                System.out.println("Failed to launch GameWindow: " + t.getMessage());
+                gw = null;
+            }
+            if (autoMode) {
+                int turns = 50;
+                int checkpoint = 5;
+                if (args.length >= 2) {
+                    try { turns = Integer.parseInt(args[1]); } catch (NumberFormatException ignored) {}
+                }
+                if (args.length >= 3) {
+                    try { checkpoint = Math.max(1, Integer.parseInt(args[2])); } catch (NumberFormatException ignored) {}
+                }
+                final int tTurns = turns;
+                final int tCheckpoint = checkpoint;
+                final Player[] apPlayers = players;
+                final Floor apFloor = currentFloor;
+                new Thread(() -> autoPlay(apPlayers, apFloor, tTurns, tCheckpoint)).start();
+            }
+            // If GUI mode, we hand control to the GUI and exit the console-driven loop.
+            try {
+                while (gw != null && gw.isDisplayable()) {
+                    Thread.sleep(200);
+                }
+            } catch (InterruptedException ignored) {}
+            input.close();
+            return;
         }
 
         // If program started with args `auto N`, run automated play for N turns
@@ -242,6 +287,7 @@ public class Main {
             int itemsCount = Math.min(6, 2 + nextFloor / 2);
             currentFloor = new Floor(nextFloor, monstersCount, itemsCount);
             currentFloor.displayItems();
+            if (gw != null) gw.setFloor(currentFloor);
             // initial monster reaction on arriving to the new floor
             Monster[] fm = currentFloor.getMonsters();
             if (fm.length > 0) {

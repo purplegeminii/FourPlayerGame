@@ -51,4 +51,20 @@ public class Item {
         this.itemType = type;
     }
 
+    public String getItemName() {
+        return this.itemName;
+    }
+
+    public String getItemType() {
+        return this.itemType;
+    }
+
+    public String getItemRank() {
+        return this.itemRank;
+    }
+
+    public int getStatBoost() {
+        return this.statBoost;
+    }
+
 }

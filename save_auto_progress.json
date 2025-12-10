@@ -6,19 +6,19 @@
       "level": 1,
       "rank": "F",
       "jobIndex": 0,
-      "hp": 937,
-      "mp": 220,
-      "strength": 5,
-      "insight": 10,
-      "agility": 5,
+      "hp": 1639,
+      "mp": 120,
+      "strength": 16,
+      "insight": 8,
+      "agility": 8,
       "vitality": 9,
-      "talent": 7,
-      "experience": 0,
+      "talent": 0,
+      "experience": 22,
       "inventory": [
-        {"name": "Starter Potion", "type": "Consumable", "rank": "white", "statBoost": 1, "slot": null },
-        {"name": "Elixir", "type": "Consumable", "rank": "purple", "statBoost": 14, "slot": null }
+        {"name": "Starter Potion", "type": "Consumable", "rank": "black", "statBoost": 3, "slot": null }
       ],
       "equipped": {
+        "hands": {"name": "Iron Shield", "type": "Equipment", "rank": "white", "statBoost": 1, "slot": "hands" }
       }
     },
     {
@@ -26,17 +26,54 @@
       "level": 1,
       "rank": "F",
       "jobIndex": 0,
-      "hp": 1052,
-      "mp": 105,
-      "strength": 8,
-      "insight": 3,
-      "agility": 10,
-      "vitality": 8,
-      "talent": 6,
-      "experience": 37,
+      "hp": 487,
+      "mp": 115,
+      "strength": 7,
+      "insight": 5,
+      "agility": 2,
+      "vitality": 1,
+      "talent": 4,
+      "experience": 0,
       "inventory": [
-        {"name": "Starter Potion", "type": "Consumable", "rank": "white", "statBoost": 1, "slot": null },
-        {"name": "Health Potion", "type": "Consumable", "rank": "black", "statBoost": 3, "slot": null }
+        {"name": "Starter Potion", "type": "Consumable", "rank": "purple", "statBoost": 13, "slot": null }
+      ],
+      "equipped": {
+      }
+    },
+    {
+      "name": "bot3",
+      "level": 1,
+      "rank": "F",
+      "jobIndex": 1,
+      "hp": 212,
+      "mp": 190,
+      "strength": 0,
+      "insight": 10,
+      "agility": 2,
+      "vitality": 3,
+      "talent": 4,
+      "experience": 0,
+      "inventory": [
+        {"name": "Starter Potion", "type": "Consumable", "rank": "black", "statBoost": 4, "slot": null },
+        {"name": "Mana Potion", "type": "Consumable", "rank": "black", "statBoost": 4, "slot": null }
+      ],
+      "equipped": {
+      }
+    },
+    {
+      "name": "bot4",
+      "level": 1,
+      "rank": "F",
+      "jobIndex": 0,
+      "hp": 668,
+      "mp": 140,
+      "strength": 10,
+      "insight": 8,
+      "agility": 5,
+      "vitality": 1,
+      "talent": 2,
+      "experience": 0,
+      "inventory": [
       ],
       "equipped": {
       }
