@@ -147,7 +147,7 @@ Next Steps:
 - Replace the ad-hoc JSON helpers with a library like Gson for more robust save/load behavior.
 
 Plans for Sprite / Asset Handling Libraries (libGDX)
------------------------------------------------
+----------------------------------------------------
 This project can benefit from a lightweight asset pipeline for icons and sprites. Below are suggested approaches using libGDX depending on how much of the app you want to migrate.
 
 - Option A — libGDX for asset loading only (recommended first step):

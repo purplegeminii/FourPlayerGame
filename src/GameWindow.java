@@ -11,6 +11,20 @@ import java.util.*;
  * Minimal Swing visualization for the tower floor, players and monsters.
  * This is intentionally simple — a static top-down layout that repaints periodically.
  */
+/**
+ * GameWindow is a lightweight Swing-based visualizer for FourPlayerGame.
+ *
+ * Responsibilities:
+ * - Render a simple top-down view of the current `Floor`, players and monsters.
+ * - Provide a right-side control panel for player actions (attack, inventory, skills, save/load).
+ * - Host an in-GUI combat log and optionally route `System.out` lines into that log.
+ *
+ * Design notes:
+ * - This UI is intentionally minimal and non-opinionated about game rules; it invokes
+ *   existing model methods (in `Player`, `Monster`, `Floor`) to perform actions.
+ * - Long-running game updates (monster retaliation) are executed off the EDT so the
+ *   Swing UI remains responsive; UI changes are always scheduled back on the EDT.
+ */
 public class GameWindow extends JFrame {
     private Floor floor;
     private Player[] players;
@@ -82,11 +96,25 @@ public class GameWindow extends JFrame {
     }
 
     // Allow external update of the floor reference so UI reflects game progression.
+    /**
+     * Replace the currently-displayed floor with a new one.
+     * This method is synchronized because the paint routine snapshots the
+     * `floor` reference without locking; synchronizing updates helps avoid
+     * simple race conditions between model updates and painting.
+     *
+     * @param floor the new Floor instance to display
+     */
     public synchronized void setFloor(Floor floor) {
         this.floor = floor;
     }
 
     // Allow external update of players array (e.g., when players are created/modified)
+    /**
+     * Replace the players array used by the UI. Kept synchronized for the
+     * same reason as `setFloor` — the renderer may iterate over `players`.
+     *
+     * @param players new players array
+     */
     public synchronized void setPlayers(Player[] players) {
         this.players = players;
     }
@@ -105,6 +133,7 @@ public class GameWindow extends JFrame {
 
         controlsPanel.add(top, BorderLayout.NORTH);
 
+        // Buttons panel: one action per row
         JPanel buttons = new JPanel();
         buttons.setLayout(new GridLayout(0,1,6,6));
         buttons.setBorder(BorderFactory.createEmptyBorder(8,8,8,8));
@@ -163,6 +192,17 @@ public class GameWindow extends JFrame {
     }
 
     // Execute a player action from the GUI using the same integer codes as console
+    /**
+     * Execute a player action triggered from the GUI. Actions are encoded
+     * as integer codes to match the console UI mapping so behavior remains
+     * consistent between UI modes.
+     *
+     * This method may present modal dialogs (skill/item selection) and
+     * calls into the game model to carry out actions. When an action
+     * consumes a turn, `postPlayerTurn()` is invoked to advance the game.
+     *
+     * @param actionCode integer representing the action to perform
+     */
     private void doPlayerAction(int actionCode) {
         int idx = playerSelector.getSelectedIndex();
         if (idx < 0 || players == null || idx >= players.length) {
@@ -210,7 +250,8 @@ public class GameWindow extends JFrame {
             try {
                 Player.attack(p, act_choice, chosen, floor);
             } catch (Exception ex) {
-                // If reflection call needed fallback, try reflective invocation
+                // If direct invocation fails try a reflective fallback; this
+                // preserves compatibility with alternate Player implementations.
                 try {
                     java.lang.reflect.Method mth = Player.class.getMethod("attack", Player.class, int.class, int.class, Floor.class);
                     mth.invoke(null, p, act_choice, chosen, floor);
@@ -218,6 +259,7 @@ public class GameWindow extends JFrame {
             }
         } else if (actionCode == 1) {
             // Show player status in a GUI dialog (scrollable)
+            // Show status in a scrollable, monospaced text area for readability
             String status = p.getFullStatusString();
             JTextArea ta = new JTextArea(status);
             ta.setEditable(false);
@@ -562,7 +604,13 @@ public class GameWindow extends JFrame {
         }
     }
 
-    // Helper to show a modal dialog with item details
+    /**
+     * Display a modal dialog showing detailed information about an item.
+     * The dialog is read-only and shows computed deltas for equipment where available.
+     *
+     * @param it the Item to inspect
+     * @param title dialog title
+     */
     private void showItemDetailsDialog(Item it, String title) {
         if (it == null) {
             JOptionPane.showMessageDialog(this, "No item data available", "Inspect", JOptionPane.INFORMATION_MESSAGE);
@@ -592,7 +640,19 @@ public class GameWindow extends JFrame {
         JOptionPane.showMessageDialog(this, sp, title, JOptionPane.PLAIN_MESSAGE);
     }
 
-    // Interactive item list dialog with actions (Inspect, Equip/Use, Pick Up, Drop)
+    /**
+     * Show a modal, interactive list of items. Actions exposed depend on the
+     * `isInventory` flag: inventory lists show Equip/Use/Drop; floor lists show Pick Up.
+     *
+     * The dialog operates on the provided list instance so callers may pass
+     * either the player's inventory or the floor's item list to allow direct
+     * modification of the underlying model.
+     *
+     * @param p the active player (used when equipping/using/picking up)
+     * @param items list instance to show and operate on
+     * @param title dialog title
+     * @param isInventory true if `items` represents player inventory
+     */
     private void showItemListDialog(Player p, java.util.List<Item> items, String title, boolean isInventory) {
         if (items == null || items.isEmpty()) {
             JOptionPane.showMessageDialog(this, "No items to show", title, JOptionPane.INFORMATION_MESSAGE);
@@ -702,7 +762,11 @@ public class GameWindow extends JFrame {
         dialog.setVisible(true);
     }
 
-    // Simple colored icon base; specific types draw different shapes. Shapes derive from slot mapping when possible.
+    /**
+     * Programmatic fallback Icon used when no PNG asset is available. The
+     * drawing chooses a simple shape based on inferred slot/type so icons
+     * remain visually informative without external assets.
+     */
     private static class TypeIcon implements Icon {
         private final Color color;
         private final int w, h;
@@ -721,6 +785,7 @@ public class GameWindow extends JFrame {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g2.setColor(color);
+            // pick drawing strategy based on computed slot or item type
             String s = slot == null ? "" : slot.toLowerCase();
             // weapon-like: draw a small blade and handle when slot indicates hands or similar
             if (s.contains("hands") || s.contains("bracer") || s.contains("glove") || this.typeStr.contains("sword") || this.typeStr.contains("axe") || this.typeStr.contains("dagger")) {
@@ -756,7 +821,7 @@ public class GameWindow extends JFrame {
                 g2.setColor(color.darker());
                 g2.fillRect(bx + bw/3, by - 2, bw/3, 3);
             }
-            // default: colored circle
+            // default: colored circle (generic fallback)
             else {
                 g2.fillOval(x, y, w, h);
             }
@@ -766,12 +831,17 @@ public class GameWindow extends JFrame {
         public int getIconHeight() { return h; }
     }
 
-    // Custom cell renderer to show small icon, name and colored rank label
+    /**
+     * List cell renderer that shows a small icon, bold item name and a colored
+     * rank label. Keeps list rows compact and readable inside the item dialog.
+     */
     private static class ItemCellRenderer implements ListCellRenderer<Item> {
         @Override
         public Component getListCellRendererComponent(JList<? extends Item> list, Item value, int index, boolean isSelected, boolean cellHasFocus) {
             JPanel p = new JPanel(new BorderLayout(6, 2));
             p.setBorder(BorderFactory.createEmptyBorder(4,4,4,4));
+            // Request an icon sized for the list row; the loader will return a
+            // cached ImageIcon if a matching PNG exists or a TypeIcon fallback.
             Icon iconObj = getIconForItem(value == null ? "" : value.itemName, value == null ? "" : value.itemType, getRankColor(value), 14, 14);
             JLabel icon = new JLabel(iconObj);
             JPanel left = new JPanel(new BorderLayout());
@@ -798,7 +868,17 @@ public class GameWindow extends JFrame {
         }
     }
 
-    // Icon cache and loader (tries resources/icons/<name>.png). Falls back to TypeIcon (programmatic)
+    /**
+     * Icon cache and loader. Lookup order:
+     * 1) specific item-name (spaces -> underscores)
+     * 2) equipment slot (computed from config)
+     * 3) item type
+     * 4) common fallbacks: `weapon`, `armor`, `potion`, `consumable`, `default`
+     *
+     * For each candidate name we look for `resources/icons/<name>.png`. Images
+     * are scaled to the requested size and cached per-size to avoid repeated
+     * ImageIO work. If no PNG is found we return a programmatic `TypeIcon`.
+     */
     private static final Map<String, Icon> iconCache = new HashMap<>();
 
     private static Icon getIconForItem(String itemName, String itemType, Color color, int w, int h) {
@@ -814,12 +894,14 @@ public class GameWindow extends JFrame {
 
         for (String t : tries) {
             String cacheKey = t + "|" + w + "x" + h;
+            // Return cached icon immediately if present
             if (iconCache.containsKey(cacheKey)) return iconCache.get(cacheKey);
             // try png file in resources/icons/
             String pngPath = "resources/icons/" + t + ".png";
             java.io.File f = new java.io.File(pngPath);
             if (f.exists() && f.isFile()) {
                 try {
+                    // scale smoothly and cache
                     Image img = new ImageIcon(pngPath).getImage().getScaledInstance(w, h, Image.SCALE_SMOOTH);
                     ImageIcon ii = new ImageIcon(img);
                     iconCache.put(cacheKey, ii);
@@ -832,7 +914,10 @@ public class GameWindow extends JFrame {
         return ti;
     }
 
-    // Derive a color from item rank or type; fallback to gray
+    /**
+     * Derive a display color from the item's rank. Supports numeric ranks and
+     * textual ranks (e.g. "legend", "epic"). Falls back to a neutral gray.
+     */
     private static Color getRankColorStatic(Item it) {
         if (it == null) return Color.GRAY;
         String r = String.valueOf(it.itemRank == null ? "" : it.itemRank);
@@ -852,7 +937,15 @@ public class GameWindow extends JFrame {
         return new Color(120,120,120);
     }
 
-    // Determine equipment slot for an item using loaded equipmentSlots mapping
+    /**
+     * Determine the equipment slot for an item using the loaded
+     * `equipmentSlots` map (populated from `config/equipment_slots.properties`).
+     * The mapping uses substring matching of either the item name or item type.
+     *
+     * @param itemName item name (may be null)
+     * @param itemType item type (may be null)
+     * @return mapped slot name, or null if no mapping could be inferred
+     */
     private static String getSlotForItem(String itemName, String itemType) {
         if ((itemName == null || itemName.isEmpty()) && (itemType == null || itemType.isEmpty())) return null;
         String name = itemName == null ? "" : itemName.toLowerCase();
