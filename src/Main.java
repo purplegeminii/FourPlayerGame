@@ -186,6 +186,8 @@ public class Main {
         if (guiMode && currentFloor != null) {
             try {
                 gw = new GameWindow(currentFloor, players);
+                // enable GUI logging (redirect System.out into the GUI combat log)
+                try { GameWindow.enableGuiLogging(); } catch (Throwable ignored) {}
             } catch (Throwable t) {
                 System.out.println("Failed to launch GameWindow: " + t.getMessage());
                 gw = null;

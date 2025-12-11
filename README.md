@@ -143,6 +143,27 @@ See `CONTRIBUTING.md` for contribution guidelines and `CODE_OF_CONDUCT.md` for c
 ---
 
 Next Steps:
-- Add an in-GUI scrolling combat log and route game messages there.
 - Improve thread-safety by moving the game loop onto a single event thread.
 - Replace the ad-hoc JSON helpers with a library like Gson for more robust save/load behavior.
+
+Plans for Sprite / Asset Handling Libraries (libGDX)
+-----------------------------------------------
+This project can benefit from a lightweight asset pipeline for icons and sprites. Below are suggested approaches using libGDX depending on how much of the app you want to migrate.
+
+- Option A — libGDX for asset loading only (recommended first step):
+	- Keep the existing Swing UI. Add libGDX as a dependency (Gradle) and use the headless backend.
+	- Use libGDX's AssetManager / Pixmap / Texture to load images and (when needed) TextureAtlas for sprite atlases.
+	- Convert libGDX Pixmap data to AWT `BufferedImage` (helper class) so `GameWindow` can continue to use `ImageIcon`/Swing components.
+	- Pros: much improved image/atlas handling with minimal GUI changes. Cons: requires adding libGDX to the build (Gradle) and a small adapter layer.
+
+- Option B — Full migration to libGDX rendering (larger effort):
+	- Replace Swing with libGDX rendering (Scene2D or raw rendering) for GPU-accelerated drawing, animation, and a single game loop.
+	- Pros: high-performance rendering, atlases, built-in asset lifecycle. Cons: significant refactor of UI and input handling; new build and native dependencies.
+
+- Option C — Lightweight image improvements without libGDX:
+	- Improve icon handling with higher-quality PNGs, ImageIO, or small helper libraries (no full game framework). Less capability than libGDX but simpler.
+
+Suggested immediate next step
+- Start with Option A: add a small Gradle build and a `LibGdxAssetLoader` adapter that initializes the libGDX headless backend and exposes a method to load PNGs as `BufferedImage`. This gives atlas and Pixmap advantages without rewriting the UI.
+
+If you'd like, I can scaffold the Gradle files and the small adapter class (AssetManager/Pixmap -> BufferedImage) and update `GameWindow` to call it when available (falling back to the existing loader when not running under Gradle).

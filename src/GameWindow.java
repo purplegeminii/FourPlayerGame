@@ -1,5 +1,8 @@
 import javax.swing.*;
 import java.awt.*;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.IOException;
 // import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.*;
@@ -12,16 +15,42 @@ public class GameWindow extends JFrame {
     private Floor floor;
     private Player[] players;
     private final int tileSize = 48;
+    // equipment slots loaded from config/equipment_slots.properties
+    private static final Map<String, String> equipmentSlots = new LinkedHashMap<>();
+    static {
+        try {
+            java.util.Properties props = new java.util.Properties();
+            java.io.File f = new java.io.File("config/equipment_slots.properties");
+            if (f.exists() && f.isFile()) {
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(f)) {
+                    props.load(fis);
+                }
+                for (String name : props.stringPropertyNames()) {
+                    equipmentSlots.put(name.toLowerCase(), props.getProperty(name));
+                }
+            }
+        } catch (Exception ignored) {}
+    }
     // UI controls
     private JComboBox<String> playerSelector;
     private JPanel controlsPanel;
     private JLabel selectedMonsterLabel;
     private int selectedMonster = -1;
+    // in-GUI combat log
+    private JTextArea combatLog;
+
+    // static reference to active GameWindow so global System.out can be routed here
+    private static volatile GameWindow activeInstance = null;
+    private static volatile boolean consoleHooked = false;
+    private static PrintStream originalOut = System.out;
 
     public GameWindow(Floor floor, Player[] players) {
         super("FourPlayerGame - Visualizer");
         this.floor = floor;
         this.players = players;
+
+        // register active instance for global logging
+        activeInstance = this;
 
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setSize(980, 640);
@@ -34,6 +63,16 @@ public class GameWindow extends JFrame {
 
         buildControls();
         add(controlsPanel, BorderLayout.EAST);
+
+        // create and add combat log area at bottom of controls
+        combatLog = new JTextArea();
+        combatLog.setEditable(false);
+        combatLog.setLineWrap(true);
+        combatLog.setWrapStyleWord(true);
+        combatLog.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        JScrollPane logScroll = new JScrollPane(combatLog);
+        logScroll.setPreferredSize(new Dimension(240, 180));
+        controlsPanel.add(logScroll, BorderLayout.SOUTH);
 
         // Repaint periodically (use javax.swing.Timer to avoid ambiguity with java.util.Timer)
         javax.swing.Timer t = new javax.swing.Timer(300, e -> dp.repaint());
@@ -187,7 +226,12 @@ public class GameWindow extends JFrame {
             sp.setPreferredSize(new Dimension(420, 320));
             JOptionPane.showMessageDialog(this, sp, p.getPlayerName() + " - Status", JOptionPane.PLAIN_MESSAGE);
         } else if (actionCode == 3) {
-            p.showInventory();
+            // Show inventory using the interactive item-list dialog (inspect/equip/use/drop)
+            if (p.inventory == null || p.inventory.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Inventory is empty");
+            } else {
+                showItemListDialog(p, p.inventory, p.getPlayerName() + " - Inventory", true);
+            }
         } else if (actionCode == 4) {
             // choose equipment from inventory
             int chosen = chooseInventoryIndex(p, "Choose equipment index to equip", true);
@@ -219,7 +263,25 @@ public class GameWindow extends JFrame {
                 JOptionPane.showMessageDialog(this, "No items to pick up");
             }
         } else if (actionCode == 8) {
-            if (floor != null && !floor.getItems().isEmpty()) floor.displayItems(); else p.showInventory();
+            // Inspect: open the interactive item-list dialog for floor items or inventory
+            String[] choices = new String[]{"Floor Items", "Inventory"};
+            String sel = (String) JOptionPane.showInputDialog(this, "Inspect which source?", "Inspect",
+                    JOptionPane.PLAIN_MESSAGE, null, choices, choices[0]);
+            if (sel == null) return; // cancelled
+            if ("Floor Items".equals(sel)) {
+                if (floor == null || floor.getItems() == null || floor.getItems().isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "No items on the floor to inspect");
+                } else {
+                    // pass the actual floor items list so actions (pick up) can modify it
+                    showItemListDialog(p, floor.getItems(), "Inspect - Floor Items", false);
+                }
+            } else {
+                if (p.inventory == null || p.inventory.isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "Inventory is empty");
+                } else {
+                    showItemListDialog(p, p.inventory, "Inspect - Inventory", true);
+                }
+            }
         }
 
         // repaint and refresh selector
@@ -239,6 +301,62 @@ public class GameWindow extends JFrame {
             selectedMonsterLabel.setText("Selected monster: " + selectedMonster);
             repaint();
         });
+    }
+
+    /**
+     * Append a message to the in-GUI combat log (thread-safe).
+     */
+    public void appendLog(String msg) {
+        if (msg == null) return;
+        SwingUtilities.invokeLater(() -> {
+            if (combatLog == null) return;
+            combatLog.append(msg);
+            if (!msg.endsWith("\n")) combatLog.append("\n");
+            combatLog.setCaretPosition(combatLog.getDocument().getLength());
+        });
+    }
+
+    /**
+     * Install a System.out redirect that also writes to the GUI combat log when available.
+     * Safe to call multiple times; only the first call installs the hook.
+     */
+    public static synchronized void enableGuiLogging() {
+        if (consoleHooked) return;
+        originalOut = System.out;
+        OutputStream os = new OutputStream() {
+            private StringBuilder buf = new StringBuilder();
+            @Override
+            public void write(int b) throws IOException {
+                // forward to original stdout
+                originalOut.write(b);
+                char c = (char) b;
+                buf.append(c);
+                if (c == '\n') {
+                    String line = buf.toString();
+                    buf.setLength(0);
+                    if (activeInstance != null) activeInstance.appendLog(line);
+                }
+            }
+            @Override
+            public void write(byte[] b, int off, int len) throws IOException {
+                originalOut.write(b, off, len);
+                String s = new String(b, off, len);
+                buf.append(s);
+                int idx;
+                while ((idx = buf.indexOf("\n")) >= 0) {
+                    String line = buf.substring(0, idx+1);
+                    buf.delete(0, idx+1);
+                    if (activeInstance != null) activeInstance.appendLog(line);
+                }
+            }
+        };
+        PrintStream ps = new PrintStream(os, true);
+        System.setOut(ps);
+        consoleHooked = true;
+    }
+
+    public static void setActiveInstance(GameWindow gw) {
+        activeInstance = gw;
     }
 
     // Called after a player performs a consuming action: monsters retaliate once and we check for floor clear
@@ -442,5 +560,309 @@ public class GameWindow extends JFrame {
                 }
             }
         }
+    }
+
+    // Helper to show a modal dialog with item details
+    private void showItemDetailsDialog(Item it, String title) {
+        if (it == null) {
+            JOptionPane.showMessageDialog(this, "No item data available", "Inspect", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("--- Item Details ---\n");
+        sb.append("Name: ").append(it.itemName).append("\n");
+        sb.append("Type: ").append(it.itemType).append("\n");
+        sb.append("Rank: ").append(it.itemRank).append("\n");
+        sb.append("Base boost: ").append(it.statBoost).append("\n");
+        if (it instanceof Consumable) {
+            sb.append("Consumable: restores ").append(it.statBoost).append(" to its target stat\n");
+        }
+        if (it instanceof Equipment) {
+            Equipment eq = (Equipment) it;
+            sb.append("Slot: ").append(eq.bodyPOS).append("\n");
+            sb.append("Computed stat delta if equipped: ").append(eq.computeStatDelta()).append("\n");
+        }
+        sb.append("--------------------\n");
+
+        JTextArea ta = new JTextArea(sb.toString());
+        ta.setEditable(false);
+        ta.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        JScrollPane sp = new JScrollPane(ta);
+        sp.setPreferredSize(new Dimension(420, 240));
+        JOptionPane.showMessageDialog(this, sp, title, JOptionPane.PLAIN_MESSAGE);
+    }
+
+    // Interactive item list dialog with actions (Inspect, Equip/Use, Pick Up, Drop)
+    private void showItemListDialog(Player p, java.util.List<Item> items, String title, boolean isInventory) {
+        if (items == null || items.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No items to show", title, JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        JDialog dialog = new JDialog(this, title, true);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setSize(520, 360);
+        dialog.setLocationRelativeTo(this);
+
+        DefaultListModel<Item> model = new DefaultListModel<>();
+        for (Item it : items) model.addElement(it);
+        JList<Item> list = new JList<>(model);
+        list.setCellRenderer(new ItemCellRenderer());
+        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        JScrollPane sp = new JScrollPane(list);
+        dialog.add(sp, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton inspectBtn = new JButton("Inspect");
+        JButton primaryBtn = new JButton(isInventory ? "Equip/Use" : "Pick Up");
+        JButton dropBtn = new JButton("Drop");
+        JButton closeBtn = new JButton("Close");
+        inspectBtn.setEnabled(false);
+        primaryBtn.setEnabled(false);
+        dropBtn.setEnabled(false);
+
+        btnPanel.add(inspectBtn);
+        btnPanel.add(primaryBtn);
+        if (isInventory) btnPanel.add(dropBtn);
+        btnPanel.add(closeBtn);
+        dialog.add(btnPanel, BorderLayout.SOUTH);
+
+        list.addListSelectionListener(e -> {
+            boolean sel = !list.isSelectionEmpty();
+            inspectBtn.setEnabled(sel);
+            dropBtn.setEnabled(sel && isInventory);
+            primaryBtn.setEnabled(sel);
+            if (sel) {
+                Item it = list.getSelectedValue();
+                if (it instanceof Equipment) primaryBtn.setText("Equip");
+                else if (it instanceof Consumable) primaryBtn.setText(isInventory ? "Use" : "Pick Up");
+                else primaryBtn.setText(isInventory ? "Use" : "Pick Up");
+            }
+        });
+
+        inspectBtn.addActionListener(a -> {
+            Item it = list.getSelectedValue();
+            if (it != null) showItemDetailsDialog(it, "Inspect - " + it.itemName);
+        });
+
+        primaryBtn.addActionListener(a -> {
+            int si = list.getSelectedIndex();
+            if (si < 0) return;
+            Item it = model.getElementAt(si);
+            if (isInventory) {
+                // operate on player's inventory
+                if (it instanceof Equipment) {
+                    // equip by inventory index
+                    p.equipFromInventory(si);
+                    // remove from model if item was removed from inventory
+                    model.remove(si);
+                } else if (it instanceof Consumable) {
+                    ((Consumable) it).use(p);
+                    model.remove(si);
+                    p.inventory.remove(it);
+                } else {
+                    // Generic use: remove and attempt to use
+                    model.remove(si);
+                    p.inventory.remove(it);
+                }
+            } else {
+                // pick up from floor -> remove from floor list and add to player inventory
+                if (floor != null && floor.getItems() != null) {
+                    int idx = items.indexOf(it);
+                    if (idx >= 0) {
+                        Item taken = items.remove(idx);
+                        p.addItem(taken);
+                        JOptionPane.showMessageDialog(dialog, p.getPlayerName() + " picked up " + taken.itemName);
+                        model.remove(si);
+                    }
+                }
+            }
+            refreshUI();
+        });
+
+        dropBtn.addActionListener(a -> {
+            int si = list.getSelectedIndex();
+            if (si < 0) return;
+            Item it = model.getElementAt(si);
+            int confirm = JOptionPane.showConfirmDialog(dialog, "Drop " + it.itemName + "?", "Drop", JOptionPane.YES_NO_OPTION);
+            if (confirm != JOptionPane.YES_OPTION) return;
+            // move to floor if available
+            if (floor != null && floor.getItems() != null) {
+                p.inventory.remove(it);
+                floor.getItems().add(it);
+            } else {
+                p.inventory.remove(it);
+            }
+            model.remove(si);
+            refreshUI();
+        });
+
+        closeBtn.addActionListener(a -> dialog.dispose());
+
+        dialog.setVisible(true);
+    }
+
+    // Simple colored icon base; specific types draw different shapes. Shapes derive from slot mapping when possible.
+    private static class TypeIcon implements Icon {
+        private final Color color;
+        private final int w, h;
+        private final String itemName;
+        private final String typeStr;
+        private final String slot;
+        public TypeIcon(String itemName, String type, Color c, int w, int h) {
+            this.itemName = itemName == null ? "" : itemName.toLowerCase();
+            this.typeStr = type == null ? "" : type.toLowerCase();
+            this.color = c;
+            this.w = w;
+            this.h = h;
+            this.slot = getSlotForItem(this.itemName, this.typeStr);
+        }
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2.setColor(color);
+            String s = slot == null ? "" : slot.toLowerCase();
+            // weapon-like: draw a small blade and handle when slot indicates hands or similar
+            if (s.contains("hands") || s.contains("bracer") || s.contains("glove") || this.typeStr.contains("sword") || this.typeStr.contains("axe") || this.typeStr.contains("dagger")) {
+                int cx = x + 2, cy = y + 2;
+                g2.fillRect(cx + 6, cy + 1, Math.max(2, w - 8), 4);
+                int tipX = cx + 6 + Math.max(2, w - 8);
+                int[] xs = { tipX, tipX + 4, tipX };
+                int[] ys = { cy + 1, cy + 3, cy + 5 };
+                g2.fillPolygon(xs, ys, 3);
+                g2.setColor(color.darker());
+                g2.fillRect(cx, cy + 6, 6, 2);
+            }
+            // armor/chest/head/feet -> draw a shield-like polygon
+            else if (s.contains("chest") || s.contains("head") || s.contains("feet") || s.contains("plate") || s.contains("armor") || this.typeStr.contains("armor") || this.typeStr.contains("shield")) {
+                int cx = x + w/2;
+                int[] xs = { cx, x + w - 2, x + w/2, x + 2 };
+                int[] ys = { y + 2, y + h/3, y + h - 2, y + h/3 };
+                g2.fillPolygon(xs, ys, 4);
+                g2.setColor(color.darker());
+                g2.drawPolygon(xs, ys, 4);
+            }
+            // necklace / ring -> draw small gem-like circle
+            else if (s.contains("finger") || s.contains("neck") || this.typeStr.contains("ring") || this.typeStr.contains("amulet")) {
+                int gx = x + 2, gy = y + 2, gw = w - 4, gh = h - 4;
+                g2.fillOval(gx, gy, gw, gh);
+                g2.setColor(color.darker());
+                g2.drawOval(gx, gy, gw, gh);
+            }
+            // potion/consumable: draw a small bottle
+            else if (this.typeStr.contains("potion") || this.typeStr.contains("consum") || this.typeStr.contains("bottle")) {
+                int bx = x + 2, by = y + 2, bw = w - 4, bh = h - 6;
+                g2.fillOval(bx, by, bw, bh);
+                g2.setColor(color.darker());
+                g2.fillRect(bx + bw/3, by - 2, bw/3, 3);
+            }
+            // default: colored circle
+            else {
+                g2.fillOval(x, y, w, h);
+            }
+            g2.dispose();
+        }
+        public int getIconWidth() { return w; }
+        public int getIconHeight() { return h; }
+    }
+
+    // Custom cell renderer to show small icon, name and colored rank label
+    private static class ItemCellRenderer implements ListCellRenderer<Item> {
+        @Override
+        public Component getListCellRendererComponent(JList<? extends Item> list, Item value, int index, boolean isSelected, boolean cellHasFocus) {
+            JPanel p = new JPanel(new BorderLayout(6, 2));
+            p.setBorder(BorderFactory.createEmptyBorder(4,4,4,4));
+            Icon iconObj = getIconForItem(value == null ? "" : value.itemName, value == null ? "" : value.itemType, getRankColor(value), 14, 14);
+            JLabel icon = new JLabel(iconObj);
+            JPanel left = new JPanel(new BorderLayout());
+            left.add(icon, BorderLayout.WEST);
+            JLabel name = new JLabel(value.itemName == null ? "(unknown)" : value.itemName);
+            name.setFont(name.getFont().deriveFont(Font.BOLD, 12f));
+            left.add(name, BorderLayout.CENTER);
+            p.add(left, BorderLayout.CENTER);
+            String rankStr = String.valueOf(value.itemRank);
+            JLabel rank = new JLabel(rankStr);
+            rank.setForeground(getRankColor(value));
+            p.add(rank, BorderLayout.EAST);
+            if (isSelected) {
+                p.setBackground(list.getSelectionBackground());
+                p.setForeground(list.getSelectionForeground());
+            } else {
+                p.setBackground(list.getBackground());
+                p.setForeground(list.getForeground());
+            }
+            return p;
+        }
+        private static Color getRankColor(Item it) {
+            return GameWindow.getRankColorStatic(it);
+        }
+    }
+
+    // Icon cache and loader (tries resources/icons/<name>.png). Falls back to TypeIcon (programmatic)
+    private static final Map<String, Icon> iconCache = new HashMap<>();
+
+    private static Icon getIconForItem(String itemName, String itemType, Color color, int w, int h) {
+        String keyBase = (itemName == null ? "" : itemName.toLowerCase()).replaceAll("\\s+", "_");
+        String slot = getSlotForItem(itemName, itemType);
+        String typeKey = (itemType == null ? "" : itemType.toLowerCase()).replaceAll("\\s+", "_");
+        java.util.List<String> tries = new ArrayList<>();
+        if (keyBase != null && !keyBase.isEmpty()) tries.add(keyBase);
+        if (slot != null && !slot.isEmpty()) tries.add(slot);
+        if (typeKey != null && !typeKey.isEmpty()) tries.add(typeKey);
+        // common fallbacks
+        tries.add("weapon"); tries.add("armor"); tries.add("potion"); tries.add("consumable"); tries.add("default");
+
+        for (String t : tries) {
+            String cacheKey = t + "|" + w + "x" + h;
+            if (iconCache.containsKey(cacheKey)) return iconCache.get(cacheKey);
+            // try png file in resources/icons/
+            String pngPath = "resources/icons/" + t + ".png";
+            java.io.File f = new java.io.File(pngPath);
+            if (f.exists() && f.isFile()) {
+                try {
+                    Image img = new ImageIcon(pngPath).getImage().getScaledInstance(w, h, Image.SCALE_SMOOTH);
+                    ImageIcon ii = new ImageIcon(img);
+                    iconCache.put(cacheKey, ii);
+                    return ii;
+                } catch (Exception ignored) {}
+            }
+        }
+        // no image found: fallback to programmatic TypeIcon
+        TypeIcon ti = new TypeIcon(itemName, itemType, color, w, h);
+        return ti;
+    }
+
+    // Derive a color from item rank or type; fallback to gray
+    private static Color getRankColorStatic(Item it) {
+        if (it == null) return Color.GRAY;
+        String r = String.valueOf(it.itemRank == null ? "" : it.itemRank);
+        // try numeric rank
+        try {
+            int v = Integer.parseInt(r);
+            if (v >= 5) return new Color(212, 175, 55); // gold
+            if (v >= 4) return new Color(186, 85, 211); // purple
+            if (v >= 3) return new Color(65, 105, 225); // blue
+            return new Color(120,120,120);
+        } catch (Exception ignored) {}
+        // text-based ranks
+        String lr = r.toLowerCase();
+        if (lr.contains("legend") || lr.contains("gold")) return new Color(212, 175, 55);
+        if (lr.contains("epic") || lr.contains("purple") || lr.contains("rare")) return new Color(186, 85, 211);
+        if (lr.contains("rare") || lr.contains("blue")) return new Color(65, 105, 225);
+        return new Color(120,120,120);
+    }
+
+    // Determine equipment slot for an item using loaded equipmentSlots mapping
+    private static String getSlotForItem(String itemName, String itemType) {
+        if ((itemName == null || itemName.isEmpty()) && (itemType == null || itemType.isEmpty())) return null;
+        String name = itemName == null ? "" : itemName.toLowerCase();
+        String type = itemType == null ? "" : itemType.toLowerCase();
+        for (Map.Entry<String,String> e : equipmentSlots.entrySet()) {
+            String key = e.getKey();
+            if ((name != null && name.contains(key)) || (type != null && type.contains(key))) {
+                return e.getValue();
+            }
+        }
+        return null;
     }
 }
